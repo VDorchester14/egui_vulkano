@@ -147,6 +147,7 @@ pub struct Painter {
     images: HashMap<egui::TextureId, Arc<ImmutableImage>>,
     texture_sets: HashMap<egui::TextureId, Arc<PersistentDescriptorSet>>,
     texture_free_queue: Vec<egui::TextureId>,
+    pixels_per_point: f32,
 }
 
 impl Painter {
@@ -170,6 +171,7 @@ impl Painter {
             images: Default::default(),
             texture_sets: Default::default(),
             texture_free_queue: Vec::new(),
+            pixels_per_point: 1.0,
         })
     }
 
@@ -204,7 +206,7 @@ impl Painter {
                             &delta.image,
                             // &mut cbb,
                             &mut builder,
-                            self.memory_allocator.clone()
+                            self.memory_allocator.clone(),
                         )?
                     } else {
                         create_immutable_image_part(
@@ -213,7 +215,7 @@ impl Painter {
                             &image,
                             // &mut cbb,
                             &mut builder,
-                            self.memory_allocator.clone()
+                            self.memory_allocator.clone(),
                         )?
                     }
                 } else {
@@ -222,7 +224,7 @@ impl Painter {
                         &delta.image,
                         // &mut cbb,
                         &mut builder,
-                        self.memory_allocator.clone()
+                        self.memory_allocator.clone(),
                     )?
                 };
                 let layout = &self.pipeline.layout().set_layouts()[0];
@@ -275,7 +277,7 @@ impl Painter {
             .next_subpass(Inline)?
             .bind_pipeline_graphics(self.pipeline.clone())
             .set_viewport(0, [viewport]);
-
+        self.pixels_per_point = egui_ctx.pixels_per_point();
         let clipped_primitives: Vec<ClippedPrimitive> = egui_ctx.tessellate(clipped_shapes);
         let num_meshes = clipped_primitives.len();
 
@@ -325,6 +327,7 @@ impl Painter {
             let o = clip.min;
             scissors.push(Scissor {
                 origin: [(o.x as u32), (o.y as u32)],
+                // dimensions: [(clip.width()) as u32, (clip.height()) as u32],
                 dimensions: [(window_size_points[0] * ppp) as u32, (window_size_points[1] * ppp) as u32],
             });
             builder.set_scissor(0, scissors);
@@ -441,6 +444,7 @@ fn create_immutable_image_full(
     cbb: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, Arc<StandardCommandBufferAllocator>>,
     allocator: Arc<StandardMemoryAllocator>,
 ) -> Result<Arc<ImmutableImage>, ImmutableImageCreationError> {
+
     let dimensions = ImageDimensions::Dim2d {
         width: texture.width() as u32,
         height: texture.height() as u32,
